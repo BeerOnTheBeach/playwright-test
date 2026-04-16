@@ -168,6 +168,22 @@ function writeIndex(baseDir) {
   fs.writeFileSync(path.join(baseDir, 'index.html'), html, 'utf8');
 }
 
+function writeRootIndex(publicDir) {
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="refresh" content="0; url=./reports/index.html" />
+  <title>Redirecting…</title>
+</head>
+<body>
+  <a href="./reports/index.html">Go to Playwright Reports</a>
+</body>
+</html>`;
+  fs.mkdirSync(publicDir, { recursive: true });
+  fs.writeFileSync(path.join(publicDir, 'index.html'), html, 'utf8');
+}
+
 function main() {
   if (!fs.existsSync(PLAYWRIGHT_REPORT_DIR)) {
     throw new Error(`Missing playwright report at ${PLAYWRIGHT_REPORT_DIR}. Run tests first.`);
@@ -191,6 +207,7 @@ function main() {
 
   cleanupOldReports(PUBLIC_REPORTS_DIR, RETENTION_DAYS);
   writeIndex(PUBLIC_REPORTS_DIR);
+  writeRootIndex(path.join(ROOT_DIR, 'public'));
 
   console.log(`Published report: ${targetDir}`);
   console.log(`Status: ${status}`);
