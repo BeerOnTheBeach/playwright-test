@@ -1,0 +1,19 @@
+{
+  "name": "playwright-testing-test",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:report": "playwright test",
+    "report:publish": "node .github/scripts/publish-report.js"
+  },
+  "dependencies": {
+    "playwright": "^1.53.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.0"
+  }
+}

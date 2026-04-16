@@ -1,0 +1,74 @@
+name: Playwright Tests & GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # 1. Hauptcode auschecken
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Bestehende Reports aus dem gh-pages Branch wiederherstellen
+      #    damit die 30-Tage-Historie erhalten bleibt
+      - name: Restore existing reports from gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: public
+        continue-on-error: true
+
+      # 3. Node.js aufsetzen
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # 4. Dependencies installieren
+      - name: Install dependencies
+        run: npm ci
+
+      # 5. Playwright Browser installieren
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      # 6. Tests ausfuehren (continue-on-error damit der Job nicht bei Testfehler abbricht)
+      - name: Run Playwright tests
+        run: npm test
+        continue-on-error: true
+
+      # 7. Report nach public/ publizieren
+      - name: Publish report
+        run: npm run report:publish
+
+      # 8. GitHub Pages konfigurieren und deployen
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
