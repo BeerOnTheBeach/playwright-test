@@ -1,217 +1,143 @@
 #!/usr/bin/env node
+/**
+ * publish-report.js
+ *
+ * Copies the latest Playwright HTML report into the `public/` directory
+ * (which the CI workflow checks out from gh-pages) and updates the rolling
+ * reports.json manifest (last MAX_REPORTS entries).
+ *
+ * The GitHub Actions workflow then uses actions/upload-pages-artifact +
+ * actions/deploy-pages to publish the result.
+ *
+ * Environment variables (set automatically by the workflow):
+ *   GITHUB_REPOSITORY – e.g. "owner/repo"
+ *   GITHUB_SHA        – commit SHA of the triggering run
+ *   GITHUB_RUN_ID     – Actions run ID
+ *
+ * Optional:
+ *   REPORT_DIR   – path to the playwright HTML report (default: playwright-report)
+ *   JUNIT_FILE   – path to the JUnit XML file         (default: test-results/junit.xml)
+ *   PUBLIC_DIR   – output directory                   (default: public)
+ *   MAX_REPORTS  – how many reports to keep           (default: 30)
+ */
 
-const fs = require('node:fs');
-const path = require('node:path');
+'use strict';
 
-const ROOT_DIR = path.resolve(__dirname, '..', '..');
-const PLAYWRIGHT_REPORT_DIR = path.join(ROOT_DIR, 'playwright-report');
-const JUNIT_FILE = path.join(ROOT_DIR, 'test-results', 'junit.xml');
-const PUBLIC_REPORTS_DIR = path.join(ROOT_DIR, 'public', 'reports');
-const RETENTION_DAYS = 30;
+const fs   = require('fs');
+const path = require('path');
 
-function pad(value) {
-  return String(value).padStart(2, '0');
+// ─── Config ──────────────────────────────────────────────────────────────────
+
+const REPORT_DIR  = process.env.REPORT_DIR  || 'playwright-report';
+const JUNIT_FILE  = process.env.JUNIT_FILE  || 'test-results/junit.xml';
+const PUBLIC_DIR  = process.env.PUBLIC_DIR  || 'public';
+const MAX_REPORTS = parseInt(process.env.MAX_REPORTS || '30', 10);
+
+const GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY || '';
+const GITHUB_SHA        = process.env.GITHUB_SHA        || 'local';
+const GITHUB_RUN_ID     = process.env.GITHUB_RUN_ID     || '';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Parse a JUnit XML and return { total, failed } */
+function parseJunit(file) {
+  if (!fs.existsSync(file)) {
+    console.warn(`⚠️  JUnit file not found: ${file} – assuming all passed.`);
+    return { total: 0, failed: 0 };
+  }
+  const xml      = fs.readFileSync(file, 'utf8');
+  const total    = parseInt((xml.match(/tests="(\d+)"/)    || [0, '0'])[1], 10);
+  const failures = parseInt((xml.match(/failures="(\d+)"/) || [0, '0'])[1], 10);
+  const errors   = parseInt((xml.match(/errors="(\d+)"/)   || [0, '0'])[1], 10);
+  return { total, failed: failures + errors };
 }
 
-function formatTimestampUTC(date) {
-  return [
-    date.getUTCFullYear(),
-    pad(date.getUTCMonth() + 1),
-    pad(date.getUTCDate())
-  ].join('-') + '_' + [pad(date.getUTCHours()), pad(date.getUTCMinutes())].join('-');
-}
-
-function parseTimestampDirName(name) {
-  const match = name.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-
-  const [, year, month, day, hour, minute] = match;
-  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)));
-}
-
-function getStatusFromJUnit(junitPath) {
-  if (!fs.existsSync(junitPath)) {
-    return 'FAILED';
-  }
-
-  const xml = fs.readFileSync(junitPath, 'utf8');
-
-  const testsuitesTag = xml.match(/<testsuites\b[^>]*>/i);
-  if (testsuitesTag) {
-    const failures = Number((testsuitesTag[0].match(/\bfailures="(\d+)"/i) || [])[1] || 0);
-    const errors = Number((testsuitesTag[0].match(/\berrors="(\d+)"/i) || [])[1] || 0);
-    return failures + errors > 0 ? 'FAILED' : 'PASSED';
-  }
-
-  const testsuiteTags = [...xml.matchAll(/<testsuite\b[^>]*>/gi)];
-  let failureCount = 0;
-  let errorCount = 0;
-
-  for (const suite of testsuiteTags) {
-    const tag = suite[0];
-    failureCount += Number((tag.match(/\bfailures="(\d+)"/i) || [])[1] || 0);
-    errorCount += Number((tag.match(/\berrors="(\d+)"/i) || [])[1] || 0);
-  }
-
-  return failureCount + errorCount > 0 ? 'FAILED' : 'PASSED';
-}
-
-function cleanupOldReports(baseDir, retentionDays) {
-  const now = Date.now();
-  const maxAgeMs = retentionDays * 24 * 60 * 60 * 1000;
-
-  if (!fs.existsSync(baseDir)) {
-    return;
-  }
-
-  for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) {
-      continue;
-    }
-
-    const reportDate = parseTimestampDirName(entry.name);
-    if (!reportDate) {
-      continue;
-    }
-
-    if (now - reportDate.getTime() > maxAgeMs) {
-      fs.rmSync(path.join(baseDir, entry.name), { recursive: true, force: true });
-    }
+/** Copy a directory recursively */
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const s = path.join(src, entry.name);
+    const d = path.join(dest, entry.name);
+    entry.isDirectory() ? copyDir(s, d) : fs.copyFileSync(s, d);
   }
 }
 
-function writeIndex(baseDir) {
-  const entries = fs.existsSync(baseDir)
-    ? fs.readdirSync(baseDir, { withFileTypes: true }).filter((entry) => entry.isDirectory())
-    : [];
+// ─── Main ────────────────────────────────────────────────────────────────────
 
-  const reports = entries
-    .map((entry) => {
-      const metaPath = path.join(baseDir, entry.name, 'meta.json');
-      let status = 'UNKNOWN';
-      let commit = '';
-      let runId = '';
+(function main() {
+  // 1. Determine pass / fail from JUnit output
+  const { total, failed } = parseJunit(JUNIT_FILE);
+  const status    = failed > 0 ? 'failed' : 'success';
+  const timestamp = new Date().toISOString();
 
-      if (fs.existsSync(metaPath)) {
-        try {
-          const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-          status = meta.status || 'UNKNOWN';
-          commit = meta.commitSha || '';
-          runId = meta.runId || '';
-        } catch {
-          status = 'UNKNOWN';
-        }
-      }
+  // slug: e.g. 2024-01-15_12-30-00
+  const slug       = timestamp.replace(/\.\d+Z$/, 'Z').replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+  const reportSlug = `reports/${slug}`;
 
-      return {
-        timestamp: entry.name,
-        status,
-        commit,
-        runId
-      };
-    })
-    .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+  console.log(`\n📋  Run summary: ${total} tests, ${failed} failed → ${status}`);
+  console.log(`📁  Report slug: ${reportSlug}`);
 
-  const rows = reports
-    .map((report) => {
-      const statusClass = report.status === 'PASSED' ? 'passed' : report.status === 'FAILED' ? 'failed' : 'unknown';
-      const commitText = report.commit ? `<code>${report.commit.slice(0, 12)}</code>` : '<span class="muted">-</span>';
-      const runText = report.runId ? `<code>${report.runId}</code>` : '<span class="muted">-</span>';
-      return `<tr>
-        <td><a href="./${report.timestamp}/index.html">${report.timestamp}</a></td>
-        <td><span class="status ${statusClass}">${report.status}</span></td>
-        <td>${commitText}</td>
-        <td>${runText}</td>
-      </tr>`;
-    })
-    .join('\n');
+  // 2. Ensure public/ exists (CI checks it out; locally it may not)
+  fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 
-  const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Playwright Reports</title>
-  <style>
-    :root { color-scheme: light dark; }
-    body { font-family: Arial, sans-serif; margin: 2rem; }
-    table { border-collapse: collapse; width: 100%; max-width: 960px; }
-    th, td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #ccc; text-align: left; }
-    .status { font-weight: 700; padding: 0.2rem 0.45rem; border-radius: 999px; display: inline-block; }
-    .passed { background: #d4edda; color: #155724; }
-    .failed { background: #f8d7da; color: #721c24; }
-    .unknown { background: #e2e3e5; color: #383d41; }
-    .muted { color: #666; }
-  </style>
-</head>
-<body>
-  <h1>Playwright Reports</h1>
-  <p>Stored reports for the last ${RETENTION_DAYS} days.</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Timestamp (UTC)</th>
-        <th>Status</th>
-        <th>Commit</th>
-        <th>Run ID</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows || '<tr><td colspan="4" class="muted">No reports yet.</td></tr>'}
-    </tbody>
-  </table>
-</body>
-</html>`;
+  // 3. Copy playwright HTML report into timestamped subfolder
+  if (!fs.existsSync(REPORT_DIR)) {
+    console.error(`❌  Report directory "${REPORT_DIR}" not found. Did the tests run?`);
+    process.exit(1);
+  }
+  const reportDest = path.join(PUBLIC_DIR, reportSlug);
+  console.log(`\n📂  Copying "${REPORT_DIR}" → "${reportDest}"…`);
+  copyDir(REPORT_DIR, reportDest);
 
-  fs.writeFileSync(path.join(baseDir, 'index.html'), html, 'utf8');
-}
-
-function writeRootIndex(publicDir) {
-  const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta http-equiv="refresh" content="0; url=./reports/index.html" />
-  <title>Redirecting…</title>
-</head>
-<body>
-  <a href="./reports/index.html">Go to Playwright Reports</a>
-</body>
-</html>`;
-  fs.mkdirSync(publicDir, { recursive: true });
-  fs.writeFileSync(path.join(publicDir, 'index.html'), html, 'utf8');
-}
-
-function main() {
-  if (!fs.existsSync(PLAYWRIGHT_REPORT_DIR)) {
-    throw new Error(`Missing playwright report at ${PLAYWRIGHT_REPORT_DIR}. Run tests first.`);
+  // 4. Update rolling reports.json manifest
+  const manifestPath = path.join(PUBLIC_DIR, 'reports.json');
+  let manifest = [];
+  if (fs.existsSync(manifestPath)) {
+    try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch { manifest = []; }
   }
 
-  const timestamp = formatTimestampUTC(new Date());
-  const status = getStatusFromJUnit(JUNIT_FILE);
-  const targetDir = path.join(PUBLIC_REPORTS_DIR, timestamp);
+  const runUrl = GITHUB_RUN_ID && GITHUB_REPOSITORY
+    ? `https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`
+    : '';
 
-  fs.mkdirSync(PUBLIC_REPORTS_DIR, { recursive: true });
-  fs.cpSync(PLAYWRIGHT_REPORT_DIR, targetDir, { recursive: true });
-
-  const meta = {
+  manifest.unshift({
+    slug:      reportSlug,
     timestamp,
-    commitSha: process.env.GITHUB_SHA || '',
-    runId: process.env.GITHUB_RUN_ID || '',
-    status
-  };
+    status,
+    total,
+    failed,
+    sha:       GITHUB_SHA.slice(0, 7),
+    runUrl,
+    reportUrl: `${reportSlug}/index.html`,
+  });
 
-  fs.writeFileSync(path.join(targetDir, 'meta.json'), JSON.stringify(meta, null, 2) + '\n', 'utf8');
+  // Evict oldest entries beyond MAX_REPORTS and remove their folders
+  if (manifest.length > MAX_REPORTS) {
+    const removed = manifest.splice(MAX_REPORTS);
+    for (const old of removed) {
+      const oldDir = path.join(PUBLIC_DIR, old.slug);
+      if (fs.existsSync(oldDir)) {
+        fs.rmSync(oldDir, { recursive: true, force: true });
+        console.log(`🗑   Removed old report: ${old.slug}`);
+      }
+    }
+  }
 
-  cleanupOldReports(PUBLIC_REPORTS_DIR, RETENTION_DAYS);
-  writeIndex(PUBLIC_REPORTS_DIR);
-  writeRootIndex(path.join(ROOT_DIR, 'public'));
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  console.log(`✅  reports.json updated (${manifest.length} entries).`);
 
-  console.log(`Published report: ${targetDir}`);
-  console.log(`Status: ${status}`);
-}
+  // 5. Copy static page assets (index.html, app.js, style.css) from scripts dir
+  const assetsDir = __dirname;
+  for (const asset of ['index.html', 'app.js', 'style.css']) {
+    const src  = path.join(assetsDir, asset);
+    const dest = path.join(PUBLIC_DIR, asset);
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, dest);
+      console.log(`📄  Copied ${asset}`);
+    } else {
+      console.warn(`⚠️   Asset not found, skipping: ${src}`);
+    }
+  }
 
-main();
-
+  console.log('\n🚀  public/ is ready for deployment.');
+})();
