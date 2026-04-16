@@ -79,7 +79,6 @@
   }
 
   async function loadReports() {
-    const loadingEl = document.getElementById('loading');
     const errorEl   = document.getElementById('error');
     const tableEl   = document.getElementById('reports-table');
     const bodyEl    = document.getElementById('reports-body');
@@ -90,9 +89,6 @@
       const res = await fetch('reports.json');
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const reports = await res.json();
-
-      loadingEl.hidden = true;
-
       if (!reports || reports.length === 0) {
         emptyEl.hidden = false;
         return;
@@ -105,7 +101,6 @@
 
       tableEl.hidden = false;
     } catch (err) {
-      loadingEl.hidden = true;
       errorEl.hidden   = false;
       errorEl.textContent = `Failed to load reports: ${err.message}`;
     }
