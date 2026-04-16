@@ -3,26 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Playwright Reports</title>
+  <title>Playwright Test Reports</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Playwright Reports</h1>
-  <p id="subtitle">Loading…</p>
+  <header>
+    <div class="header-inner">
+      <svg class="logo" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="14" cy="14" r="14" fill="#2D4A3E"/>
+        <path d="M7 10l7 8 7-8" stroke="#45BA7F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <h1>Playwright Reports</h1>
+        <p class="subtitle">Last <span id="report-count">–</span> test runs</p>
+      </div>
+    </div>
+  </header>
 
-  <table id="reports-table" hidden>
-    <thead>
-      <tr>
-        <th>Status</th>
-        <th>Timestamp</th>
-        <th>Results</th>
-        <th>Commit</th>
-        <th>Report</th>
-      </tr>
-    </thead>
-    <tbody id="reports-body"></tbody>
-  </table>
+  <main>
+    <div id="error" class="error-msg" hidden></div>
+    <table id="reports-table" hidden>
+      <thead>
+        <tr>
+          <th class="col-status">Status</th>
+          <th class="col-time">Timestamp</th>
+          <th class="col-results">Results</th>
+          <th class="col-sha">Commit</th>
+          <th class="col-actions">Report</th>
+        </tr>
+      </thead>
+      <tbody id="reports-body"></tbody>
+    </table>
+    <p id="empty-msg" class="empty-msg" hidden>No reports published yet.</p>
+  </main>
 
   <script src="app.js"></script>
 </body>
 </html>
+
