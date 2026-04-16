@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-/**
- * publish-report.js
- *
- * Copies the latest Playwright HTML report into the `public/` directory
- * (which the CI workflow checks out from gh-pages) and updates the rolling
- * reports.json manifest (last MAX_REPORTS entries).
- *
- * The GitHub Actions workflow then uses actions/upload-pages-artifact +
- * actions/deploy-pages to publish the result.
- *
- * Environment variables (set automatically by the workflow):
- *   GITHUB_REPOSITORY – e.g. "owner/repo"
- *   GITHUB_SHA        – commit SHA of the triggering run
- *   GITHUB_RUN_ID     – Actions run ID
- *
- * Optional:
- *   REPORT_DIR   – path to the playwright HTML report (default: playwright-report)
- *   JUNIT_FILE   – path to the JUnit XML file         (default: test-results/junit.xml)
- *   PUBLIC_DIR   – output directory                   (default: public)
- *   MAX_REPORTS  – how many reports to keep           (default: 30)
- */
-
 'use strict';
 
 const fs   = require('fs');
