@@ -10,7 +10,7 @@ test('successful test', async () => {
   });
 });
 
-test('failing test', async () => {
+test('sometimes failing test', async () => {
   await test.step('Step 1: still successful', async () => {
     expect(true).toBeTruthy();
   });
