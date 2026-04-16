@@ -1,5 +1,15 @@
 [
   {
+    "slug": "reports/2026-04-16_12-51-38",
+    "timestamp": "2026-04-16T12:51:38.040Z",
+    "status": "failed",
+    "total": 2,
+    "failed": 1,
+    "sha": "6a795e5",
+    "runUrl": "https://github.com/BeerOnTheBeach/playwright-test/actions/runs/24511143184",
+    "reportUrl": "reports/2026-04-16_12-51-38/index.html"
+  },
+  {
     "slug": "reports/2026-04-16_12-48-13",
     "timestamp": "2026-04-16T12:48:13.925Z",
     "status": "failed",
