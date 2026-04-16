@@ -8,30 +8,18 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: gh-pages
   cancel-in-progress: false
 
 jobs:
   test-and-publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Restore existing reports from gh-pages
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: public
-        continue-on-error: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -45,6 +33,14 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
+      - name: Fetch existing reports.json from gh-pages
+        run: |
+          mkdir -p public
+          curl -sf "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/gh-pages/reports.json" \
+            -o public/reports.json || echo "[]" > public/reports.json
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
       - name: Run Playwright tests
         run: npm test
         continue-on-error: true
@@ -52,13 +48,10 @@ jobs:
       - name: Publish report
         run: npm run report:publish
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: public
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          keep_files: true
 
