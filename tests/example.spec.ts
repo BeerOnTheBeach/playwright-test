@@ -22,9 +22,5 @@ test('failing test', async () => {
       expect(1).toBe(1);
     }
   });
-
-  await test.step('Step 3: should not be reached', async () => {
-    expect('this should not run').toBe('unreachable');
-  });
 });
 
