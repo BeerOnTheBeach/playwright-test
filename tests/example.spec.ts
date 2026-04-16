@@ -15,8 +15,12 @@ test('failing test', async () => {
     expect(true).toBeTruthy();
   });
 
-  await test.step('Step 2: intentional failure', async () => {
-    expect(1).toBe(2);
+  await test.step('Step 2: intentional failure (50% chance)', async () => {
+    if (Math.random() < 0.5) {
+      expect(1).toBe(2);
+    } else {
+      expect(1).toBe(1);
+    }
   });
 
   await test.step('Step 3: should not be reached', async () => {
