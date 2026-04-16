@@ -72,27 +72,6 @@ main {
   padding: 0 1.5rem;
 }
 
-/* ─── Loading ──────────────────────────────────────────────────────────────── */
-.loading {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  color: var(--text-muted);
-  padding: 3rem 0;
-  justify-content: center;
-}
-
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--border);
-  border-top-color: var(--blue);
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
 /* ─── Error ────────────────────────────────────────────────────────────────── */
 .error-msg {
   background: var(--red-bg);
