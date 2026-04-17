@@ -9,7 +9,7 @@ const path = require('path');
 const REPORT_DIR  = process.env.REPORT_DIR  || 'playwright-report';
 const JUNIT_FILE  = process.env.JUNIT_FILE  || 'test-results/junit.xml';
 const PUBLIC_DIR  = process.env.PUBLIC_DIR  || 'public';
-const MAX_REPORTS = parseInt(process.env.MAX_REPORTS || '30', 10);
+const MAX_REPORTS = parseInt(process.env.MAX_REPORTS || '10', 10);
 
 const GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY || '';
 const GITHUB_SHA        = process.env.GITHUB_SHA        || 'local';
