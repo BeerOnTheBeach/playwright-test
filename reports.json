@@ -1,5 +1,15 @@
 [
   {
+    "slug": "reports/2026-04-17_06-57-49",
+    "timestamp": "2026-04-17T06:57:49.183Z",
+    "status": "success",
+    "total": 2,
+    "failed": 0,
+    "sha": "ed9c5f7",
+    "runUrl": "https://github.com/BeerOnTheBeach/playwright-test/actions/runs/24552220168",
+    "reportUrl": "reports/2026-04-17_06-57-49/index.html"
+  },
+  {
     "slug": "reports/2026-04-16_13-08-48",
     "timestamp": "2026-04-16T13:08:48.419Z",
     "status": "success",
@@ -88,25 +98,5 @@
     "sha": "62e8df3",
     "runUrl": "https://github.com/BeerOnTheBeach/playwright-test/actions/runs/24510447448",
     "reportUrl": "reports/2026-04-16_12-34-51/index.html"
-  },
-  {
-    "slug": "reports/2026-04-16_12-28-43",
-    "timestamp": "2026-04-16T12:28:43.978Z",
-    "status": "failed",
-    "total": 2,
-    "failed": 1,
-    "sha": "5e17cf5",
-    "runUrl": "https://github.com/BeerOnTheBeach/playwright-test/actions/runs/24510173908",
-    "reportUrl": "reports/2026-04-16_12-28-43/index.html"
-  },
-  {
-    "slug": "reports/2026-04-16_12-25-14",
-    "timestamp": "2026-04-16T12:25:14.263Z",
-    "status": "failed",
-    "total": 2,
-    "failed": 1,
-    "sha": "fa60d54",
-    "runUrl": "https://github.com/BeerOnTheBeach/playwright-test/actions/runs/24510015556",
-    "reportUrl": "reports/2026-04-16_12-25-14/index.html"
   }
 ]
